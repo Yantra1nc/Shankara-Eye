@@ -1,0 +1,146 @@
+/**
+ *@NApiVersion 2.x
+ *@NScriptType ClientScript
+ */
+
+/*************************************************************
+ * File Header
+ * Script Type: Client Script
+ * Script Name: PO_RestrictItemonlocation.js
+ * File Name: PO_IM_Last_Purchase_rate.js
+ * Created On: 09/12/2021
+ * Modified On:
+ * Created By: Ujjwala Pilai (Yantra Inc.)
+ * Modified By: Nikita S
+ * Description:
+ *********************************************************** */
+
+define(['N/search', 'N/log', 'N/currentRecord'],
+
+    function (search, log, currentRecord) {
+    function validateLine(context) {
+
+        var currentRecord = context.currentRecord;
+        var fieldName = context.fieldId;
+        var sublistName = context.sublistId;
+
+ //       if (sublistName == 'item' ) 
+        {
+            try {
+                var REC_LOC = currentRecord.getText({
+                    fieldId: "location"
+                });
+                log.debug("REC_LOC", REC_LOC);
+				var parentBodyLoc = currentRecord.getValue({
+                    fieldId: "location"
+                });
+                log.debug("parentBodyLoc", parentBodyLoc);
+                var itemId = currentRecord.getCurrentSublistValue({
+                    sublistId: 'item',
+                    fieldId: 'item'
+					
+                });
+				log.debug("Item Data", itemId);
+				var itemType = currentRecord.getCurrentSublistValue({
+                    sublistId: 'item',
+                    fieldId: 'itemtype'
+					
+                });
+				log.debug('itemType',itemType)
+                var temparr = [];
+				if(itemType=='InvtPart')
+				{
+                if (_validateData(itemId)) {
+                    var inventoryitemSearchObj = search.create({
+                        type: "item",
+                        filters:
+                        [
+						
+							["type","anyof","InvtPart"], 
+							   "AND", 
+                            ["internalid", "anyof", itemId],
+							"AND", 
+						["custitem_sankara_location_availability","anyof",parentBodyLoc]
+                        ],
+                        columns:
+					   [
+						  search.createColumn({name: "custitem_sankara_location_availability", label: "Availability At Pharma Locations"})
+					   ]
+                    });
+					
+                    var searchResultCount = inventoryitemSearchObj.runPaged().count;
+                    log.debug("inventoryitemSearchObj result count", searchResultCount);
+                    inventoryitemSearchObj.run().each(function (result) {
+                        // .run().each has a limit of 4,000 results
+                        return true;
+                    });
+                    var searchResult = inventoryitemSearchObj.run();
+                    //log.debug("search result",searchResult);
+
+                    var searchresultRange = searchResult.getRange({
+                        start: 0,
+                        end: 50
+                    });
+					 var flag = 1;
+                    //log.debug("searchresultRange",searchresultRange);
+                    if (searchResultCount > 0) {
+                        for (var i = 0; i < searchresultRange.length; i++) {
+							var presentAtLoc  = searchresultRange[i].getValue({
+                               name: "custitem_sankara_location_availability", label: "Availability At Pharma Locations"
+                            });
+							log.debug('presentAtLoc',presentAtLoc)
+							var splitId = presentAtLoc.split(",")
+							log.debug('splitId',splitId)
+							for(var j=0;j<splitId.length;j++)
+							{
+								temparr.push(splitId[j])
+							}
+                          /*  var itemloc = searchresultRange[i].getValue({
+                                name: "name",
+                                join: "inventoryLocation",
+                                label: "Name"
+                            });
+                            temparr.push(itemloc);*/
+                        }
+						log.debug('temparr',temparr)
+                       
+                        for (var i = 0; i < temparr.length; i++) {
+                            if (parentBodyLoc == temparr[i]) {
+                                flag = 0;
+                                break;
+                            }
+                        }
+                    }
+                }
+			}
+                if (flag == 1) {
+                    alert("Item doesnt exist for this location");
+                  /*  currentRecord.cancelLine({
+                        sublistId: 'item'
+                    });
+					*/
+					return false;
+                }
+		     return true;
+			 
+            } catch (e) {
+                log.error("Error In FC", e);
+            }
+
+        }
+		
+		
+
+    }
+    function _validateData(val) {
+        if (val != null && val != 'undefined' && val != 'NaN' && val != '') {
+            return true;
+        }
+        return false;
+    }
+
+    return {
+        validateLine: validateLine
+    };
+
+});
